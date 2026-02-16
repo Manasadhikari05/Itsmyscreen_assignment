@@ -515,18 +515,4 @@ web: gunicorn -k eventlet -w 1 app:app --bind 0.0.0.0:$PORT
 6. **Database**: Least privilege database user
 7. **Secrets**: Environment variables for all secrets
 
----
 
-## 📜 License
-
-MIT License - Feel free to use for learning or production.
-
----
-
-## 🙏 Acknowledgments
-
-Built with:
-- Flask & Flask-SocketIO
-- SQLAlchemy
-- Chart.js
-- Gunicorn & Eventlet
