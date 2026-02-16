@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # Initialize SocketIO with eventlet for async support
 socketio = SocketIO(
     cors_allowed_origins="*",
-    async_mode='eventlet',
+    async_mode='gevent',
     ping_timeout=60,
     ping_interval=25
 )

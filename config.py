@@ -34,7 +34,7 @@ class Config:
 
     # SocketIO Configuration
     SOCKETIO_MESSAGE_QUEUE = os.environ.get('SOCKETIO_MESSAGE_QUEUE', None)
-    SOCKETIO_ASYNC_MODE = 'eventlet'
+    SOCKETIO_ASYNC_MODE = 'gevent'
     SOCKETIO_CORS_ALLOWED_ORIGINS = "*"
     SOCKETIO_PING_TIMEOUT = 60
     SOCKETIO_PING_INTERVAL = 25
