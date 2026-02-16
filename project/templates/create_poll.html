@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Create Poll - RealTimePoll{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1 class="hero-title">Create a Poll</h1>
+    <p class="hero-subtitle">Share your question and collect opinions in real-time with beautiful, instant results.</p>
+</div>
+
+<div class="card">
+    <form method="POST" action="/create" id="pollForm">
+        <div class="form-group">
+            <label class="form-label" for="question">Your Question</label>
+            <input 
+                type="text" 
+                id="question" 
+                name="question" 
+                class="form-input" 
+                placeholder="What would you like to ask?"
+                value="{{ question|default('') }}"
+                required
+                maxlength="500"
+            >
+            <p class="form-hint">Be specific and clear for better responses</p>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Poll Options</label>
+            <p class="form-hint">Add at least 2 options (up to 10)</p>
+            
+            <div class="options-container" id="optionsContainer">
+                {% if options %}
+                    {% for option in options %}
+                    <div class="option-row">
+                        <span class="option-number">{{ loop.index }}</span>
+                        <input 
+                            type="text" 
+                            name="option_{{ loop.index }}" 
+                            class="form-input option-input" 
+                            placeholder="Option {{ loop.index }}"
+                            value="{{ option }}"
+                            required
+                            maxlength="200"
+                        >
+                        {% if loop.index > 2 %}
+                        <button type="button" class="btn-remove-option" onclick="removeOption(this)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="option-row">
+                    <span class="option-number">1</span>
+                    <input 
+                        type="text" 
+                        name="option_1" 
+                        class="form-input option-input" 
+                        placeholder="Option 1"
+                        required
+                        maxlength="200"
+                    >
+                </div>
+                <div class="option-row">
+                    <span class="option-number">2</span>
+                    <input 
+                        type="text" 
+                        name="option_2" 
+                        class="form-input option-input" 
+                        placeholder="Option 2"
+                        required
+                        maxlength="200"
+                    >
+                </div>
+                {% endif %}
+            </div>
+            
+            <button type="button" class="btn-add-option" id="addOptionBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Option
+            </button>
+        </div>
+
+        <button type="submit" class="btn-primary">
+            Create Poll
+        </button>
+    </form>
+</div>
+
+<script>
+    let optionCount = {{ options|length if options else 2 }};
+    const maxOptions = 10;
+    const minOptions = 2;
+
+    document.getElementById('addOptionBtn').addEventListener('click', function() {
+        if (optionCount >= maxOptions) {
+            return;
+        }
+        
+        optionCount++;
+        
+        const container = document.getElementById('optionsContainer');
+        const newRow = document.createElement('div');
+        newRow.className = 'option-row';
+        newRow.innerHTML = `
+            <span class="option-number">${optionCount}</span>
+            <input 
+                type="text" 
+                name="option_${optionCount}" 
+                class="form-input option-input" 
+                placeholder="Option ${optionCount}"
+                required
+                maxlength="200"
+            >
+            <button type="button" class="btn-remove-option" onclick="removeOption(this)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        `;
+        
+        container.appendChild(newRow);
+        
+        if (optionCount >= maxOptions) {
+            document.getElementById('addOptionBtn').style.display = 'none';
+        }
+    });
+
+    function removeOption(btn) {
+        const container = document.getElementById('optionsContainer');
+        const rows = container.querySelectorAll('.option-row');
+        
+        if (rows.length <= minOptions) {
+            return;
+        }
+        
+        const row = btn.closest('.option-row');
+        row.remove();
+        
+        const remainingRows = container.querySelectorAll('.option-row');
+        remainingRows.forEach((row, index) => {
+            const number = row.querySelector('.option-number');
+            const input = row.querySelector('.option-input');
+            const removeBtn = row.querySelector('.btn-remove-option');
+            
+            number.textContent = index + 1;
+            input.name = 'option_' + (index + 1);
+            input.placeholder = 'Option ' + (index + 1);
+            
+            if (removeBtn) {
+                removeBtn.style.display = index >= minOptions ? 'flex' : 'none';
+            }
+        });
+        
+        optionCount = remainingRows.length;
+        document.getElementById('addOptionBtn').style.display = 'inline-flex';
+    }
+
+    document.querySelectorAll('.option-row').forEach((row, index) => {
+        const removeBtn = row.querySelector('.btn-remove-option');
+        if (removeBtn) {
+            removeBtn.style.display = index >= minOptions ? 'flex' : 'none';
+        }
+    });
+</script>
+{% endblock %}

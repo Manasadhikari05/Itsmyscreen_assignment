@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}{{ poll.question[:50] }}... - RealTimePoll{% endblock %}
+
+{% block content %}
+<div class="poll-container">
+    <div class="poll-header">
+        <h1 class="poll-question">{{ poll.question }}</h1>
+        <div class="poll-badge">
+            <span class="poll-badge-dot"></span>
+            Live Results
+        </div>
+    </div>
+    
+    <div class="vote-section">
+        {% if has_voted %}
+        <div class="voted-badge">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            You've voted
+        </div>
+        {% endif %}
+        
+        <form id="voteForm">
+            <div class="options-list">
+                {% for option in poll.options %}
+                <div class="option-item {% if has_voted and voted_option_id == option.id %}voted{% endif %}" 
+                     data-option-id="{{ option.id }}">
+                    <input 
+                        type="radio" 
+                        name="option" 
+                        id="option_{{ option.id }}" 
+                        value="{{ option.id }}"
+                        class="option-input"
+                        {% if has_voted %}disabled{% endif %}
+                    >
+                    <label for="option_{{ option.id }}" class="option-label">
+                        <span class="option-radio"></span>
+                        <span class="option-text">{{ option.option_text }}</span>
+                        <span class="option-votes" id="votes_{{ option.id }}">{{ option.vote_count }}</span>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            
+            {% if not has_voted %}
+            <button type="submit" class="btn-primary" id="voteBtn" disabled>
+                Submit Vote
+            </button>
+            {% endif %}
+            
+            <div class="error-message-box" id="errorMessage"></div>
+        </form>
+    </div>
+    
+    <div class="results-section">
+        <div class="results-header">
+            <h2 class="results-title">Live Results</h2>
+            <span class="results-total" id="totalVotes">{{ results.total_votes }} votes</span>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="resultsChart"></canvas>
+        </div>
+        
+        <div class="results-list" id="resultsList">
+            {% for result in results.options %}
+            <div class="result-item">
+                <div class="result-header">
+                    <span class="result-text">{{ result.option_text }}</span>
+                    <span class="result-percentage">{{ result.percentage }}%</span>
+                </div>
+                <div class="result-bar">
+                    <div class="result-fill" style="width: {{ result.percentage }}%" id="bar_{{ result.id }}"></div>
+                </div>
+                <div class="result-count" id="count_{{ result.id }}">{{ result.vote_count }} vote{{ 's' if result.vote_count != 1 else '' }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="share-section">
+        <a href="/poll/{{ poll.poll_code }}/share" class="share-link-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            Share this poll
+        </a>
+    </div>
+</div>
+
+<script>
+    const pollCode = '{{ poll.poll_code }}';
+    const hasVoted = {{ 'true' if has_voted else 'false' }};
+    const votedOptionId = {{ voted_option_id if voted_option_id else 'null' }};
+    let chart = null;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        initSocket();
+        initVoteForm();
+        initChart();
+        
+        if (window.socket) {
+            window.socket.emit('join_poll', { poll_code: pollCode });
+        }
+    });
+    
+    function initVoteForm() {
+        const form = document.getElementById('voteForm');
+        const options = document.querySelectorAll('.option-item');
+        const voteBtn = document.getElementById('voteBtn');
+        
+        options.forEach(option => {
+            option.addEventListener('click', function() {
+                if (hasVoted) return;
+                
+                options.forEach(o => o.classList.remove('selected'));
+                this.classList.add('selected');
+                voteBtn.disabled = false;
+            });
+        });
+        
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const selectedOption = document.querySelector('input[name="option"]:checked');
+            if (!selectedOption) return;
+            
+            const optionId = selectedOption.value;
+            voteBtn.disabled = true;
+            voteBtn.innerHTML = '<span class="loading-spinner"></span> Submitting...';
+            
+            try {
+                const response = await fetch(`/poll/${pollCode}/vote`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        option_id: optionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    options.forEach(o => {
+                        if (parseInt(o.dataset.optionId) === parseInt(optionId)) {
+                            o.classList.add('voted');
+                        }
+                        o.querySelector('input').disabled = true;
+                    });
+                    
+                    voteBtn.innerHTML = 'Vote Submitted!';
+                    voteBtn.style.background = '#34c759';
+                    
+                    showError('');
+                } else {
+                    showError(data.error || 'Failed to submit vote');
+                    voteBtn.disabled = false;
+                    voteBtn.innerHTML = 'Submit Vote';
+                    
+                    if (data.already_voted) {
+                        window.location.reload();
+                    }
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+                voteBtn.disabled = false;
+                voteBtn.innerHTML = 'Submit Vote';
+            }
+        });
+    }
+    
+    function showError(message) {
+        const errorEl = document.getElementById('errorMessage');
+        if (message) {
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+        } else {
+            errorEl.classList.remove('show');
+        }
+    }
+    
+    function initChart() {
+        const ctx = document.getElementById('resultsChart').getContext('2d');
+        
+        const labels = {{ results.options|map(attribute='option_text')|list|tojson }};
+        const data = {{ results.options|map(attribute='vote_count')|list|tojson }};
+        
+        chart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        '#0071e3',
+                        '#34c759',
+                        '#ff9500',
+                        '#ff3b30',
+                        '#af52de',
+                        '#5856d6',
+                        '#00c7be',
+                        '#ff2d55'
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            font: {
+                                family: 'DM Sans, sans-serif',
+                                size: 13,
+                                weight: '500'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                        padding: 14,
+                        cornerRadius: 10,
+                        titleFont: {
+                            family: 'DM Sans, sans-serif',
+                            size: 14,
+                            weight: '600'
+                        },
+                        bodyFont: {
+                            family: 'DM Sans, sans-serif',
+                            size: 13
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 800,
+                    easing: 'easeOutQuart'
+                }
+            }
+        });
+    }
+    
+    function updateResults(results) {
+        if (!results || !results.options) return;
+        
+        if (chart) {
+            chart.data.labels = results.options.map(o => o.option_text);
+            chart.data.datasets[0].data = results.options.map(o => o.vote_count);
+            chart.update('none');
+        }
+        
+        const totalVotes = results.total_votes;
+        document.getElementById('totalVotes').textContent = `${totalVotes} vote${totalVotes !== 1 ? 's' : ''}`;
+        
+        results.options.forEach(option => {
+            const votesEl = document.getElementById(`votes_${option.id}`);
+            const countEl = document.getElementById(`count_${option.id}`);
+            const barEl = document.getElementById(`bar_${option.id}`);
+            
+            if (votesEl) votesEl.textContent = option.vote_count;
+            if (countEl) countEl.textContent = `${option.vote_count} vote${option.vote_count !== 1 ? 's' : ''}`;
+            if (barEl) barEl.style.width = `${option.percentage}%`;
+        });
+    }
+</script>
+{% endblock %}

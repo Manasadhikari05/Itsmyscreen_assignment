@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Share Poll - RealTimePoll{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1 class="hero-title">Your Poll is Ready</h1>
+    <p class="hero-subtitle">Share your poll link to start collecting votes instantly.</p>
+</div>
+
+<div class="card share-card">
+    <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"/>
+    </svg>
+    
+    <h2 class="share-question">{{ poll.question }}</h2>
+    
+    <div class="share-link-box">
+        <input 
+            type="text" 
+            class="share-link-input" 
+            id="shareLink" 
+            value="{{ poll_url }}" 
+            readonly
+        >
+        <button class="btn-copy" id="copyBtn" onclick="copyLink()">
+            <span>Copy</span>
+        </button>
+    </div>
+    
+    <div class="action-buttons">
+        <a href="/poll/{{ poll.poll_code }}" class="btn-action btn-action-primary">
+            View Poll & Vote
+        </a>
+        <a href="/" class="btn-action btn-action-secondary">
+            Create Another Poll
+        </a>
+    </div>
+</div>
+
+<script>
+    function copyLink() {
+        const linkInput = document.getElementById('shareLink');
+        const copyBtn = document.getElementById('copyBtn');
+        
+        linkInput.select();
+        linkInput.setSelectionRange(0, 99999);
+        
+        navigator.clipboard.writeText(linkInput.value).then(function() {
+            copyBtn.querySelector('span').textContent = 'Copied!';
+            copyBtn.classList.add('copied');
+            
+            setTimeout(function() {
+                copyBtn.querySelector('span').textContent = 'Copy';
+                copyBtn.classList.remove('copied');
+            }, 2000);
+        }, function(err) {
+            console.error('Could not copy text: ', err);
+        });
+    }
+</script>
+{% endblock %}
